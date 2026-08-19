@@ -13,13 +13,13 @@ Herramienta para transformar archivos de clientes en obligaciones tributarias pr
 
 ## Estructura
 
-├── frontend/ SPA con Next.js
-├── functions/ Cloud Functions (ingesta, cruces, validación)
-├── shared/ Esquemas y tipos TypeScript compartidos
-├── normativa/ Configuración versionada (tasas, umbrales, reglas)
-├── docs/ Documentación
-│ └── PRD-plataforma-consultoria-fiscal-sv.md
-└── firebase.json Configuración Firebase
+  ├── frontend/ SPA con Next.js
+  ├── functions/ Cloud Functions (ingesta, cruces, validación)
+  ├── shared/ Esquemas y tipos TypeScript compartidos
+  ├── normativa/ Configuración versionada (tasas, umbrales, reglas)
+  ├── docs/ Documentación
+  │ └── PRD-plataforma-consultoria-fiscal-sv.md
+  └── firebase.json Configuración Firebase
 
 
 ## Desarrollo
