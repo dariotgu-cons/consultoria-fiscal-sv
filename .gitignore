@@ -141,3 +141,26 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Firebase
+.firebaserc
+firebase-debug.log
+.firebase/
+.runtimeconfig.json
+
+# Node
+node_modules/
+.env.local
+.env.*.local
+dist/
+build/
+
+# Prototipos/respaldo
+/legacy_html/
+
+# Dependencias de IDE
+.vscode/settings.json
+.idea/
+
+# Datos de prueba (cuando los generes)
+# NO ignorar: /normativa/ (configuración versionada va a git)
