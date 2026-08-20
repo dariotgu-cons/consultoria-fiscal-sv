@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DIVISION_TERRITORIAL, SECTORES } from "shared";
 import type { NuevoCliente } from "@/lib/clientes";
 
 export default function ClienteFormModal({
@@ -15,9 +16,22 @@ export default function ClienteFormModal({
   const [giro, setGiro] = useState("");
   const [sector, setSector] = useState("");
   const [regimenEspecial, setRegimenEspecial] = useState("");
-  const [municipiosTexto, setMunicipiosTexto] = useState("");
+  const [departamento, setDepartamento] = useState(DIVISION_TERRITORIAL[0].departamento);
+  const [municipios, setMunicipios] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  const municipiosDelDepartamento =
+    DIVISION_TERRITORIAL.find((d) => d.departamento === departamento)?.municipios ?? [];
+
+  function agregarMunicipio(nombre: string) {
+    if (!nombre || municipios.includes(nombre)) return;
+    setMunicipios([...municipios, nombre]);
+  }
+
+  function quitarMunicipio(nombre: string) {
+    setMunicipios(municipios.filter((m) => m !== nombre));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,10 +44,7 @@ export default function ClienteFormModal({
         giro,
         sector,
         regimenEspecial: regimenEspecial.trim() || null,
-        municipios: municipiosTexto
-          .split(",")
-          .map((m) => m.trim())
-          .filter(Boolean),
+        municipios,
       });
     } catch {
       setError("No se pudo guardar el cliente. Intenta de nuevo.");
@@ -45,7 +56,7 @@ export default function ClienteFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <form
         onSubmit={handleSubmit}
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-black/10 bg-white p-6 shadow-lg dark:border-white/10 dark:bg-zinc-900"
+        className="flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-lg border border-black/10 bg-white p-6 shadow-lg dark:border-white/10 dark:bg-zinc-900"
       >
         <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Nuevo cliente</h2>
 
@@ -75,7 +86,16 @@ export default function ClienteFormModal({
           <input required value={giro} onChange={(e) => setGiro(e.target.value)} className={inputClase} />
         </Campo>
         <Campo label="Sector">
-          <input required value={sector} onChange={(e) => setSector(e.target.value)} className={inputClase} />
+          <select required value={sector} onChange={(e) => setSector(e.target.value)} className={inputClase}>
+            <option value="" disabled>
+              Selecciona un sector
+            </option>
+            {SECTORES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </Campo>
         <Campo label="Régimen especial (opcional)">
           <input
@@ -84,13 +104,59 @@ export default function ClienteFormModal({
             className={inputClase}
           />
         </Campo>
-        <Campo label="Municipios (separados por coma)">
-          <input
-            value={municipiosTexto}
-            onChange={(e) => setMunicipiosTexto(e.target.value)}
-            className={inputClase}
-            placeholder="San Salvador, Santa Tecla"
-          />
+
+        <Campo label="Municipios">
+          <div className="flex gap-2">
+            <select
+              value={departamento}
+              onChange={(e) => setDepartamento(e.target.value)}
+              className={`${inputClase} flex-1`}
+            >
+              {DIVISION_TERRITORIAL.map((d) => (
+                <option key={d.departamento} value={d.departamento}>
+                  {d.departamento}
+                </option>
+              ))}
+            </select>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                agregarMunicipio(e.target.value);
+                e.target.value = "";
+              }}
+              className={`${inputClase} flex-1`}
+            >
+              <option value="" disabled>
+                Agregar municipio…
+              </option>
+              {municipiosDelDepartamento.map((m) => (
+                <option key={m.nombre} value={m.nombre}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {municipios.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {municipios.map((m) => (
+                <span
+                  key={m}
+                  className="flex items-center gap-1 rounded-full bg-black/[.05] px-2.5 py-1 text-xs text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300"
+                >
+                  {m}
+                  <button
+                    type="button"
+                    onClick={() => quitarMunicipio(m)}
+                    aria-label={`Quitar ${m}`}
+                    className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </Campo>
 
         <div className="mt-2 flex justify-end gap-2">
