@@ -59,7 +59,10 @@ function usuario(overrides) {
 function cliente(overrides) {
   return {
     despachoId: overrides.despachoId,
-    identificacionFiscal: "0000-000000-000-0",
+    // Las reglas exigen identificacionFiscal == ID del documento (el NIT es
+    // la llave primaria); "cliente1" es el ID usado en casi todos los casos
+    // de prueba, y se sobreescribe donde el ID del documento es distinto.
+    identificacionFiscal: "cliente1",
     razonSocial: "Empresa de prueba",
     giro: "comercio",
     sector: "comercio",
@@ -96,7 +99,10 @@ describe("aislamiento multi-tenant", () => {
   it("titular de despacho A no puede leer clientes de despacho B", async () => {
     await seed(async (db) => {
       await setDoc(doc(db, "usuarios/uidTitularA"), usuario({ uid: "uidTitularA", despachoId: "despachoA", rol: "titular" }));
-      await setDoc(doc(db, "despachos/despachoB/clientes/clienteB"), cliente({ despachoId: "despachoB" }));
+      await setDoc(
+        doc(db, "despachos/despachoB/clientes/clienteB"),
+        cliente({ despachoId: "despachoB", identificacionFiscal: "clienteB" })
+      );
     });
     const titularA = testEnv.authenticatedContext("uidTitularA").firestore();
     await assertFails(getDoc(doc(titularA, "despachos/despachoB/clientes/clienteB")));
@@ -186,6 +192,36 @@ describe("prevencion de escalamiento de privilegios", () => {
     await assertFails(
       updateDoc(doc(titularA, "despachos/despachoA/clientes/cliente1"), {
         creadoEn: Timestamp.fromDate(new Date(2000, 0, 1)),
+      })
+    );
+  });
+
+  it("el NIT del cliente debe coincidir con el ID del documento (evita duplicados)", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "usuarios/uidTitularA"), usuario({ uid: "uidTitularA", despachoId: "despachoA", rol: "titular" }));
+    });
+    const titularA = testEnv.authenticatedContext("uidTitularA").firestore();
+    await assertFails(
+      setDoc(
+        doc(titularA, "despachos/despachoA/clientes/cliente1"),
+        cliente({ despachoId: "despachoA", identificacionFiscal: "0614-120398-102-3" })
+      )
+    );
+  });
+
+  it("no se puede crear dos veces un cliente con el mismo NIT (mismo ID de documento)", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "usuarios/uidTitularA"), usuario({ uid: "uidTitularA", despachoId: "despachoA", rol: "titular" }));
+      await setDoc(doc(db, "despachos/despachoA/clientes/cliente1"), cliente({ despachoId: "despachoA" }));
+    });
+    const titularA = testEnv.authenticatedContext("uidTitularA").firestore();
+    // El cliente ya lo verifica con un getDoc antes de escribir (ver
+    // lib/clientes.ts); a nivel de reglas, un segundo create al mismo ID
+    // simplemente sobreescribe el documento -- por eso identificacionFiscal
+    // debe ser inmutable en update, no solo validado en create.
+    await assertFails(
+      updateDoc(doc(titularA, "despachos/despachoA/clientes/cliente1"), {
+        identificacionFiscal: "otro-nit",
       })
     );
   });

@@ -152,6 +152,9 @@ service cloud.firestore {
               'sector', 'regimenEspecial', 'municipios', 'creadoEn', 'actualizadoEn'
             ]) &&
             d.despachoId == despachoId &&
+            // El NIT/NRC es el ID del documento: asi un duplicado es
+            // estructuralmente imposible (create falla si el doc ya existe).
+            d.identificacionFiscal == clienteId &&
             d.identificacionFiscal is string && d.identificacionFiscal.size() > 0 && d.identificacionFiscal.size() < 30 &&
             d.razonSocial is string && d.razonSocial.size() > 0 && d.razonSocial.size() < 200 &&
             d.giro is string && d.giro.size() < 100 &&
@@ -165,6 +168,7 @@ service cloud.firestore {
         allow create: if esTitular(despachoId) && clienteValido();
         allow update: if esTitular(despachoId) && clienteValido() &&
           request.resource.data.despachoId == resource.data.despachoId &&
+          request.resource.data.identificacionFiscal == resource.data.identificacionFiscal &&
           request.resource.data.creadoEn == resource.data.creadoEn;
         allow delete: if esTitular(despachoId);
 

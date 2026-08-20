@@ -18,12 +18,38 @@ export type NuevoCliente = Pick<
   "identificacionFiscal" | "razonSocial" | "giro" | "sector" | "regimenEspecial" | "municipios"
 >;
 
-/** M1.1: alta de cliente. */
+export class ClienteYaExisteError extends Error {}
+export class IdentificacionFiscalInvalidaError extends Error {}
+
+/** Firestore no permite "/" en un ID de documento; el resto de simbolos se
+ * restringen ademas para mantener el NIT/NRC como llave estable. */
+const FORMATO_IDENTIFICACION_FISCAL = /^[0-9A-Za-z-]+$/;
+
+/**
+ * M1.1: alta de cliente.
+ *
+ * La identificacion fiscal (NIT/NRC) es el ID del documento: es la llave
+ * natural del cliente, y usarla como ID hace que un duplicado sea
+ * estructuralmente imposible (create falla si ya existe), reforzado ademas
+ * en firestore.rules.
+ */
 export async function crearCliente(despachoId: string, datos: NuevoCliente): Promise<string> {
-  const ref = doc(clientesRef(despachoId));
+  const identificacionFiscal = datos.identificacionFiscal.trim();
+  if (!FORMATO_IDENTIFICACION_FISCAL.test(identificacionFiscal)) {
+    throw new IdentificacionFiscalInvalidaError(
+      "La identificación fiscal solo puede tener números, letras y guiones."
+    );
+  }
+
+  const ref = doc(clientesRef(despachoId), identificacionFiscal);
+  if ((await getDoc(ref)).exists()) {
+    throw new ClienteYaExisteError(`Ya existe un cliente con la identificación fiscal ${identificacionFiscal}.`);
+  }
+
   await setDoc(ref, {
-    despachoId,
     ...datos,
+    identificacionFiscal,
+    despachoId,
     creadoEn: serverTimestamp(),
     actualizadoEn: serverTimestamp(),
   });

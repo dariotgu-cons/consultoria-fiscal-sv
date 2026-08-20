@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DIVISION_TERRITORIAL, SECTORES } from "shared";
-import type { NuevoCliente } from "@/lib/clientes";
+import { ClienteYaExisteError, IdentificacionFiscalInvalidaError, type NuevoCliente } from "@/lib/clientes";
 
 export default function ClienteFormModal({
   onCancelar,
@@ -46,8 +46,12 @@ export default function ClienteFormModal({
         regimenEspecial: regimenEspecial.trim() || null,
         municipios,
       });
-    } catch {
-      setError("No se pudo guardar el cliente. Intenta de nuevo.");
+    } catch (err) {
+      setError(
+        err instanceof ClienteYaExisteError || err instanceof IdentificacionFiscalInvalidaError
+          ? err.message
+          : "No se pudo guardar el cliente. Intenta de nuevo."
+      );
       setGuardando(false);
     }
   }
