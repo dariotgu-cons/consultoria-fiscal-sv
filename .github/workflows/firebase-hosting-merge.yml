@@ -14,7 +14,7 @@ jobs:
       - run: npm ci && npm run build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCNtT_r3FuX_orzaJ4kPUJROIPk059hxq4
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: consultoria-fiscal-dev-2026.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: consultoria-fiscal-dev-2026.web.app
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: consultoria-fiscal-dev-2026
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: consultoria-fiscal-dev-2026.firebasestorage.app
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "359032675710"
