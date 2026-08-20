@@ -1,0 +1,378 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model  (ver shared/src/firestore-model.ts)
+// ===============================================================
+//
+// Collection: usuarios (TOP-LEVEL, no anidada bajo despachos -- necesario
+//   para poder resolver "a que despacho/rol pertenece este uid" sin conocer
+//   de antemano el despachoId)
+// Document ID: uid de Firebase Auth
+// Fields:
+//   - uid: string (== ID del doc, inmutable)
+//   - despachoId: string (inmutable tras creacion)
+//   - email, nombre: string
+//   - rol: string en ['titular','asistente','lectura','cliente']
+//   - clientesAsignados: list<string> (ids de Cliente; ignorado si rol == 'titular')
+//   - activo: bool
+//   - creadoEn: timestamp
+//   Provisionado por backend (Admin SDK, bypassa estas reglas). Ningun
+//   cliente puede crear ni modificar su propio documento de usuario --
+//   evita autoescalar rol o despacho.
+//
+// Collection: despachos/{despachoId}
+// Fields: id, nombre: string; creadoEn: timestamp
+//   Gestionado por backend. Los miembros solo leen su propio despacho.
+//
+// Collection: despachos/{despachoId}/clientes/{clienteId}
+// Fields:
+//   - despachoId: string (== path, inmutable)
+//   - identificacionFiscal, razonSocial, giro, sector: string
+//   - regimenEspecial: string | null
+//   - municipios: list<string>
+//   - creadoEn, actualizadoEn: timestamp
+//
+// Collection: .../clientes/{clienteId}/perfilesDeMapeo/{perfilId}
+// Fields: clienteId, tipoInsumo: string; mapeoColumnas: map<string,string>; actualizadoEn: timestamp
+//
+// Collection: .../clientes/{clienteId}/ejercicios/{ejercicioId}
+// Fields:
+//   - despachoId, clienteId: string (== path, inmutables)
+//   - anio: number; estado: string enum; responsableUid: string
+//   - bloqueado: bool (M1.6 -- un ejercicio aprobado se bloquea)
+//   - creadoEn, actualizadoEn: timestamp
+//
+// Subcollections de ejercicio (configuraciones, insumos, resultados,
+// ajustes, formularios): cada documento lleva ejercicioId == path y
+// respeta el bloqueo del ejercicio padre salvo para el rol titular.
+//
+// Collection: .../ejercicios/{ejercicioId}/bitacora/{eventoId}
+//   INMUTABLE: solo create, nunca update ni delete (M13.6).
+//
+// Collection: catalogoNormativo/{id}, plantillasFormulario/{id},
+//   ordenanzasMunicipales/{id}: compartidas entre despachos (M14.3).
+//   Lectura para cualquier usuario activo; escritura solo rol titular
+//   (no hay super-admin separado todavia -- un solo despacho en fase 1).
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -----------------------------------------------------------
+    // Helper functions
+    // -----------------------------------------------------------
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function existeUsuario(uid) {
+      return exists(/databases/$(database)/documents/usuarios/$(uid));
+    }
+
+    function usuarioDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    // Usuario activo y con documento provisionado (requisito de todo lo demas).
+    function usuarioActivo() {
+      return estaAutenticado() && existeUsuario(request.auth.uid) && usuarioDoc().activo == true;
+    }
+
+    function esDelDespacho(despachoId) {
+      return usuarioActivo() && usuarioDoc().despachoId == despachoId;
+    }
+
+    function esTitular(despachoId) {
+      return esDelDespacho(despachoId) && usuarioDoc().rol == 'titular';
+    }
+
+    // M13.2: autorizacion por rol y por cliente asignado.
+    function tieneAccesoACliente(despachoId, clienteId) {
+      return esDelDespacho(despachoId) &&
+        (usuarioDoc().rol == 'titular' ||
+         (usuarioDoc().rol in ['asistente', 'lectura'] &&
+          clienteId in usuarioDoc().clientesAsignados));
+    }
+
+    function puedeOperarCliente(despachoId, clienteId) {
+      return tieneAccesoACliente(despachoId, clienteId) && usuarioDoc().rol in ['titular', 'asistente'];
+    }
+
+    function ejercicioPadre(despachoId, clienteId, ejercicioId) {
+      return get(/databases/$(database)/documents/despachos/$(despachoId)/clientes/$(clienteId)/ejercicios/$(ejercicioId)).data;
+    }
+
+    // M1.6: expediente aprobado queda bloqueado salvo para el titular.
+    function puedeEditarEjercicio(despachoId, clienteId, ejercicioId) {
+      return puedeOperarCliente(despachoId, clienteId) &&
+        (ejercicioPadre(despachoId, clienteId, ejercicioId).bloqueado != true || esTitular(despachoId));
+    }
+
+    function esTimestampReciente(campo) {
+      return campo is timestamp && campo <= request.time;
+    }
+
+    function esHash256(valor) {
+      return valor is string && valor.matches('^[a-f0-9]{64}$');
+    }
+
+    // -----------------------------------------------------------
+    // usuarios (top-level)
+    // -----------------------------------------------------------
+
+    match /usuarios/{uid} {
+      // Un usuario ve su propio perfil, o el de un colega de su mismo despacho.
+      allow read: if estaAutenticado() &&
+        (request.auth.uid == uid ||
+         (usuarioActivo() && resource.data.despachoId == usuarioDoc().despachoId));
+
+      // Provisionado exclusivamente por backend (Admin SDK). Ningun cliente
+      // puede crearse ni modificarse a si mismo: evitaria autoescalar rol,
+      // despacho o clientesAsignados.
+      allow write: if false;
+    }
+
+    // -----------------------------------------------------------
+    // despachos y su arbol de clientes/ejercicios
+    // -----------------------------------------------------------
+
+    match /despachos/{despachoId} {
+      allow read: if esDelDespacho(despachoId);
+      // Alta de despacho la hace el backend (Admin SDK) al provisionar al
+      // primer usuario titular.
+      allow write: if false;
+
+      match /clientes/{clienteId} {
+        function clienteValido() {
+          let d = request.resource.data;
+          return d.keys().hasOnly([
+              'despachoId', 'identificacionFiscal', 'razonSocial', 'giro',
+              'sector', 'regimenEspecial', 'municipios', 'creadoEn', 'actualizadoEn'
+            ]) &&
+            d.despachoId == despachoId &&
+            d.identificacionFiscal is string && d.identificacionFiscal.size() > 0 && d.identificacionFiscal.size() < 30 &&
+            d.razonSocial is string && d.razonSocial.size() > 0 && d.razonSocial.size() < 200 &&
+            d.giro is string && d.giro.size() < 100 &&
+            d.sector is string && d.sector.size() < 100 &&
+            (d.regimenEspecial == null || (d.regimenEspecial is string && d.regimenEspecial.size() < 100)) &&
+            d.municipios is list && d.municipios.size() < 50 &&
+            d.creadoEn is timestamp && d.actualizadoEn is timestamp;
+        }
+
+        allow read: if tieneAccesoACliente(despachoId, clienteId);
+        allow create: if esTitular(despachoId) && clienteValido();
+        allow update: if esTitular(despachoId) && clienteValido() &&
+          request.resource.data.despachoId == resource.data.despachoId &&
+          request.resource.data.creadoEn == resource.data.creadoEn;
+        allow delete: if esTitular(despachoId);
+
+        match /perfilesDeMapeo/{perfilId} {
+          function perfilValido() {
+            let d = request.resource.data;
+            return d.keys().hasOnly(['clienteId', 'tipoInsumo', 'mapeoColumnas', 'actualizadoEn']) &&
+              d.clienteId == clienteId &&
+              d.tipoInsumo in [
+                'planilla_anual', 'retenciones_terceros', 'socios_dividendos',
+                'libro_compras_iva', 'libro_ventas_contribuyentes', 'declaraciones_mensuales'
+              ] &&
+              d.mapeoColumnas is map && d.mapeoColumnas.size() < 200 &&
+              d.actualizadoEn is timestamp;
+          }
+
+          allow read: if tieneAccesoACliente(despachoId, clienteId);
+          allow write: if puedeOperarCliente(despachoId, clienteId) && perfilValido();
+        }
+
+        match /ejercicios/{ejercicioId} {
+          function ejercicioValido() {
+            let d = request.resource.data;
+            return d.keys().hasOnly([
+                'despachoId', 'clienteId', 'anio', 'estado', 'responsableUid',
+                'bloqueado', 'creadoEn', 'actualizadoEn'
+              ]) &&
+              d.despachoId == despachoId && d.clienteId == clienteId &&
+              d.anio is number && d.anio > 2000 && d.anio < 2100 &&
+              d.estado in [
+                'borrador', 'esperando_insumos', 'mapeado', 'procesado',
+                'revisado', 'aprobado', 'presentado', 'archivado'
+              ] &&
+              d.responsableUid is string &&
+              d.bloqueado is bool &&
+              d.creadoEn is timestamp && d.actualizadoEn is timestamp;
+          }
+
+          allow read: if tieneAccesoACliente(despachoId, clienteId);
+          allow create: if puedeOperarCliente(despachoId, clienteId) && ejercicioValido();
+          allow update: if ejercicioValido() &&
+            request.resource.data.despachoId == resource.data.despachoId &&
+            request.resource.data.clienteId == resource.data.clienteId &&
+            request.resource.data.creadoEn == resource.data.creadoEn &&
+            (puedeOperarCliente(despachoId, clienteId) && (resource.data.bloqueado != true || esTitular(despachoId)));
+          allow delete: if esTitular(despachoId);
+
+          match /configuraciones/{configId} {
+            function configuracionValida() {
+              let d = request.resource.data;
+              return d.keys().hasOnly([
+                  'ejercicioId', 'version', 'tasas', 'umbrales', 'tolerancias',
+                  'reglas', 'vigenteDesde', 'creadoPorUid'
+                ]) &&
+                d.ejercicioId == ejercicioId &&
+                d.version is number && d.version > 0 &&
+                d.tasas is map && d.tasas.size() < 200 &&
+                d.umbrales is map && d.umbrales.size() < 200 &&
+                d.tolerancias is map && d.tolerancias.size() < 200 &&
+                d.reglas is map && d.reglas.size() < 500 &&
+                d.vigenteDesde is timestamp &&
+                d.creadoPorUid == request.auth.uid;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && configuracionValida();
+            // Versionada: nunca se actualiza una version existente, solo se crean nuevas.
+            allow update, delete: if false;
+          }
+
+          match /insumos/{insumoId} {
+            function insumoValido() {
+              let d = request.resource.data;
+              return d.keys().hasOnly([
+                  'ejercicioId', 'tipo', 'nombreArchivoOriginal', 'huella',
+                  'storagePath', 'estado', 'filasAgregadas', 'cargadoPorUid',
+                  'cargadoEn', 'borrarEn'
+                ]) &&
+                d.ejercicioId == ejercicioId &&
+                d.tipo in [
+                  'planilla_anual', 'retenciones_terceros', 'socios_dividendos',
+                  'libro_compras_iva', 'libro_ventas_contribuyentes', 'declaraciones_mensuales'
+                ] &&
+                d.nombreArchivoOriginal is string && d.nombreArchivoOriginal.size() < 300 &&
+                esHash256(d.huella) &&
+                (d.storagePath == null ||
+                  (d.storagePath is string &&
+                   d.storagePath.matches('^despachos/' + despachoId + '/clientes/' + clienteId + '/ejercicios/' + ejercicioId + '/.*'))) &&
+                d.estado in ['pendiente', 'cargado', 'mapeado', 'procesado', 'con_error'] &&
+                (d.filasAgregadas == null || (d.filasAgregadas is map && d.filasAgregadas.size() < 1000)) &&
+                d.cargadoPorUid == request.auth.uid &&
+                d.cargadoEn is timestamp && d.borrarEn is timestamp;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && insumoValido();
+            allow update: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && insumoValido() &&
+              request.resource.data.cargadoPorUid == resource.data.cargadoPorUid;
+            allow delete: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId);
+          }
+
+          match /resultados/{resultadoId} {
+            function resultadoValido() {
+              let d = request.resource.data;
+              return d.keys().hasOnly(['ejercicioId', 'agregados', 'cruces', 'liquidacion', 'generadoEn']) &&
+                d.ejercicioId == ejercicioId &&
+                d.agregados is map && d.agregados.size() < 500 &&
+                d.cruces is map && d.cruces.size() < 500 &&
+                (d.liquidacion == null || (d.liquidacion is map && d.liquidacion.size() < 500)) &&
+                d.generadoEn is timestamp;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create, update: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && resultadoValido();
+            allow delete: if esTitular(despachoId);
+          }
+
+          match /ajustes/{ajusteId} {
+            function ajusteValido() {
+              let d = request.resource.data;
+              return d.keys().hasOnly([
+                  'ejercicioId', 'concepto', 'tipo', 'monto', 'baseLegal',
+                  'origen', 'autorUid', 'creadoEn'
+                ]) &&
+                d.ejercicioId == ejercicioId &&
+                d.concepto is string && d.concepto.size() > 0 && d.concepto.size() < 300 &&
+                d.tipo is string && d.tipo.size() < 100 &&
+                d.monto is number &&
+                d.baseLegal is string && d.baseLegal.size() < 300 &&
+                d.origen is string && d.origen.size() < 100 &&
+                d.autorUid == request.auth.uid &&
+                d.creadoEn is timestamp;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && ajusteValido();
+            allow update: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && ajusteValido() &&
+              request.resource.data.autorUid == resource.data.autorUid &&
+              request.resource.data.creadoEn == resource.data.creadoEn;
+            allow delete: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId);
+          }
+
+          match /formularios/{formularioId} {
+            function formularioValido() {
+              let d = request.resource.data;
+              return d.keys().hasOnly([
+                  'ejercicioId', 'codigo', 'version', 'estado', 'rutaPdf',
+                  'acuseRecibo', 'generadoEn'
+                ]) &&
+                d.ejercicioId == ejercicioId &&
+                d.codigo is string && d.codigo.size() < 20 &&
+                d.version is string && d.version.size() < 20 &&
+                d.estado in ['generado', 'revisado', 'presentado'] &&
+                (d.rutaPdf == null || (d.rutaPdf is string && d.rutaPdf.size() < 500)) &&
+                (d.acuseRecibo == null || (d.acuseRecibo is string && d.acuseRecibo.size() < 500)) &&
+                d.generadoEn is timestamp;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create, update: if puedeEditarEjercicio(despachoId, clienteId, ejercicioId) && formularioValido();
+            allow delete: if esTitular(despachoId);
+          }
+
+          // M13.6: bitacora inmutable -- solo create, nunca update ni delete.
+          match /bitacora/{eventoId} {
+            function bitacoraValida() {
+              let d = request.resource.data;
+              return d.keys().hasOnly([
+                  'ejercicioId', 'evento', 'autorUid', 'fecha',
+                  'valorAnterior', 'valorNuevo', 'motivo'
+                ]) &&
+                d.ejercicioId == ejercicioId &&
+                d.evento is string && d.evento.size() > 0 && d.evento.size() < 200 &&
+                d.autorUid == request.auth.uid &&
+                esTimestampReciente(d.fecha) &&
+                d.motivo is string && d.motivo.size() < 500;
+            }
+
+            allow read: if tieneAccesoACliente(despachoId, clienteId);
+            allow create: if puedeOperarCliente(despachoId, clienteId) && bitacoraValida();
+            allow update, delete: if false;
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Catalogo normativo -- compartido entre despachos (M8, M14.3)
+    // -----------------------------------------------------------
+
+    match /catalogoNormativo/{obligacionId} {
+      allow read: if usuarioActivo();
+      allow write: if usuarioActivo() && usuarioDoc().rol == 'titular';
+    }
+
+    match /plantillasFormulario/{plantillaId} {
+      allow read: if usuarioActivo();
+      allow write: if usuarioActivo() && usuarioDoc().rol == 'titular';
+    }
+
+    match /ordenanzasMunicipales/{municipioId} {
+      allow read: if usuarioActivo();
+      allow write: if usuarioActivo() && usuarioDoc().rol == 'titular';
+    }
+
+    // Default deny explicito para cualquier ruta no contemplada arriba.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

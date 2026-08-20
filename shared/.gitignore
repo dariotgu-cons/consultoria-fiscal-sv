@@ -1,0 +1,7 @@
+# Compiled JavaScript files
+lib/**/*.js
+lib/**/*.js.map
+lib/**/*.d.ts
+
+# Node.js dependency directory
+node_modules/
