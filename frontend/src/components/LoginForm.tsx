@@ -7,7 +7,7 @@ import {
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 function mapAuthError(code: string): string {
   switch (code) {
@@ -37,7 +37,7 @@ export default function LoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
       router.push("/dashboard");
     } catch (err) {
       const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
@@ -51,7 +51,7 @@ export default function LoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
       router.push("/dashboard");
     } catch (err) {
       const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";

@@ -12,5 +12,18 @@ const firebaseConfig = {
 };
 
 export const app: FirebaseApp = getApps()[0] ?? initializeApp(firebaseConfig);
-export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+
+// getAuth/getFirestore validate the config eagerly and throw if it's missing,
+// so they must stay lazy: Next.js evaluates this module while prerendering
+// static pages at build time, before any real env vars or browser exist.
+let authInstance: Auth | undefined;
+export function getFirebaseAuth(): Auth {
+  if (!authInstance) authInstance = getAuth(app);
+  return authInstance;
+}
+
+let dbInstance: Firestore | undefined;
+export function getFirebaseDb(): Firestore {
+  if (!dbInstance) dbInstance = getFirestore(app);
+  return dbInstance;
+}

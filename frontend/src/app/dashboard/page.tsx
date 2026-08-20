@@ -3,7 +3,7 @@
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 
 export default function DashboardPage() {
@@ -33,7 +33,7 @@ export default function DashboardPage() {
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{user.email}</p>
         <button
           type="button"
-          onClick={() => signOut(auth)}
+          onClick={() => signOut(getFirebaseAuth())}
           className="mt-2 rounded-full border border-black/10 px-5 py-2.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/10 dark:text-zinc-50 dark:hover:bg-white/[.04]"
         >
           Cerrar sesión
