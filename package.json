@@ -10,6 +10,11 @@
   "scripts": {
     "dev": "firebase emulators:start",
     "build": "npm run build -w shared && npm run build -w frontend && npm run build -w functions",
-    "test": "npm test -w functions"
+    "test": "npm test -w functions",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test firestore.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.18.0"
   }
 }
