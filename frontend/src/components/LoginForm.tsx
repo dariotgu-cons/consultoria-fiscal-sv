@@ -20,7 +20,7 @@ export default function LoginForm() {
     try {
       await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
       // onAuthStateChanged (in AuthProvider) picks up the new session and
-      // the root page redirects to /dashboard once `user` updates.
+      // the root page redirects to /cartera once `user` updates.
     } catch (err) {
       setError(mapAuthError(authErrorCode(err)));
     } finally {
