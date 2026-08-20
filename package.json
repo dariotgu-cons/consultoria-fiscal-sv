@@ -1,0 +1,15 @@
+{
+  "name": "consultoria-fiscal-sv",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "functions",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "firebase emulators:start",
+    "build": "npm run build -w frontend && npm run build -w functions",
+    "test": "npm test -w functions"
+  }
+}
