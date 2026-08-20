@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Sin esto, el navegador no sabe renderizar los controles nativos
+     (select, scrollbar, checkbox) en oscuro cuando la pagina esta en
+     oscuro -- el popup de un <select> queda con texto casi invisible. */
+  color-scheme: light dark;
 }
 
 @theme inline {

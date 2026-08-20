@@ -86,7 +86,7 @@ export default function ClienteFormModal({
           <input required value={giro} onChange={(e) => setGiro(e.target.value)} className={inputClase} />
         </Campo>
         <Campo label="Sector">
-          <select required value={sector} onChange={(e) => setSector(e.target.value)} className={inputClase}>
+          <select required value={sector} onChange={(e) => setSector(e.target.value)} className={selectClase}>
             <option value="" disabled>
               Selecciona un sector
             </option>
@@ -110,7 +110,7 @@ export default function ClienteFormModal({
             <select
               value={departamento}
               onChange={(e) => setDepartamento(e.target.value)}
-              className={`${inputClase} flex-1`}
+              className={`${selectClase} flex-1`}
             >
               {DIVISION_TERRITORIAL.map((d) => (
                 <option key={d.departamento} value={d.departamento}>
@@ -124,7 +124,7 @@ export default function ClienteFormModal({
                 agregarMunicipio(e.target.value);
                 e.target.value = "";
               }}
-              className={`${inputClase} flex-1`}
+              className={`${selectClase} flex-1`}
             >
               <option value="" disabled>
                 Agregar municipio…
@@ -182,6 +182,12 @@ export default function ClienteFormModal({
 
 const inputClase =
   "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/10 dark:focus:border-white/30";
+
+// <select> necesita fondo/texto explicitos (no transparente/heredado): el
+// popup de opciones lo pinta el navegador a partir de estos valores, y sin
+// ellos puede quedar con muy poco contraste en modo oscuro.
+const selectClase =
+  "rounded-md border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:border-white/30";
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
