@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es-SV">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plataforma de Consultoría Fiscal · El Salvador</title>
+<meta name="description" content="Prototipo funcional — consultoría fiscal y estratégica para El Salvador. Hito: informes de enero 2027.">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="stylesheet" href="assets/css/print.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23052E2B'/%3E%3Cpath d='M9 22V10h10M9 16h8' stroke='%2334D399' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ═══════════════════ PANTALLA DE ACCESO (M13.1) ═══════════════════ -->
+<div class="auth" id="auth">
+  <div class="auth-art">
+    <div>
+      <div class="row-tight">
+        <div class="sb-mark" style="width:38px;height:38px;font-size:17px;">CF</div>
+        <div>
+          <div style="font-size:15px;font-weight:660;">Consultoría Fiscal SV</div>
+          <div class="sb-sub">Hacienda · San Salvador</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width:430px;">
+      <div class="t-2xl" style="line-height:1.25;">El cumplimiento es la puerta de entrada.<br>La estrategia es el producto.</div>
+      <p style="color:var(--ee-200);opacity:.85;font-size:14px;margin-top:14px;line-height:1.6;">
+        Los archivos del cliente se convierten en obligaciones presentadas y en hallazgos de negocio,
+        con la normativa salvadoreña ya modelada.
+      </p>
+
+      <div style="margin-top:32px;">
+        <div class="auth-feat">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <div><div class="ft">Motor determinista</div><div class="fd">Mismos insumos y misma configuración producen el mismo resultado. La IA nunca calcula una cifra fiscal.</div></div>
+        </div>
+        <div class="auth-feat">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"/></svg>
+          <div><div class="ft">No custodia</div><div class="fd">Zona de tránsito con borrado automático. El Art. 147 CT es obligación del contribuyente.</div></div>
+        </div>
+        <div class="auth-feat">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+          <div><div class="ft">Trazabilidad total</div><div class="fd">Todo número presentable se rastrea hasta su fila de origen.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--ee-200);opacity:.6;">
+      Prototipo funcional · v2.0 · Data simulada
+    </div>
+  </div>
+
+  <div class="auth-form">
+    <div class="auth-box">
+      <!-- Paso 1: credenciales -->
+      <div id="authStep1">
+        <div class="t-2xl">Acceso</div>
+        <p class="page-sub" style="margin-bottom:26px;">Fase 1 — solo el consultor titular. Los roles de asistente y revisor están modelados pero no habilitados (D10).</p>
+
+        <div class="stack">
+          <div class="field">
+            <label class="label" for="authUser">Correo</label>
+            <input class="input" id="authUser" type="email" value="dtorres@consultoria.sv" autocomplete="username">
+          </div>
+          <div class="field">
+            <label class="label" for="authPass">Contraseña</label>
+            <input class="input" id="authPass" type="password" value="demo1234" autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label class="label" for="authRole">Rol de la sesión <span class="t-mut2" style="font-weight:400;">(demostración de M13.2)</span></label>
+            <select class="select" id="authRole">
+              <option value="titular">Consultor titular — acceso completo</option>
+              <option value="asistente">Asistente — opera, no aprueba ni cambia reglas</option>
+              <option value="lectura">Revisor / lectura — solo consulta</option>
+            </select>
+          </div>
+          <button class="btn btn-pri btn-lg btn-block" id="btnLogin">Continuar</button>
+          <div class="note n-legal t-sm">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <div>Prototipo con data simulada. Cualquier credencial es aceptada; el segundo factor es un simulacro de M13.1.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paso 2: segundo factor -->
+      <div id="authStep2" hidden>
+        <button class="btn btn-ghost btn-sm mb-3" id="btnBackAuth">← Volver</button>
+        <div class="t-2xl">Segundo factor</div>
+        <p class="page-sub" style="margin-bottom:26px;">Código de 6 dígitos de la aplicación autenticadora. En este prototipo el código es <b class="t-mono">204 815</b>.</p>
+        <div class="otp" id="otpBox">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+        </div>
+        <div id="otpErr" class="note n-crit t-sm mt-3" hidden>
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <div>Código incorrecto. Use <b>204815</b>.</div>
+        </div>
+        <button class="btn btn-pri btn-lg btn-block mt-4" id="btnOtp">Verificar y entrar</button>
+        <button class="btn btn-ghost btn-block mt-3" id="btnAutofill">Rellenar el código automáticamente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ APLICACIÓN ═══════════════════ -->
+<div class="app" id="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-mark">CF</div>
+      <div>
+        <div class="sb-name">Consultoría Fiscal SV</div>
+        <div class="sb-sub" id="sbEjercicio">Ejercicio 2026</div>
+      </div>
+    </div>
+
+    <nav class="sb-nav" id="sbNav"><!-- render por JS --></nav>
+
+    <div class="sb-foot">
+      <div class="sb-user">
+        <div class="sb-av" id="sbAv">DT</div>
+        <div style="min-width:0;flex:1;">
+          <div class="sb-uname" id="sbUser">Darío Torres</div>
+          <div class="sb-urole" id="sbRole">Consultor titular</div>
+        </div>
+        <button class="btn btn-icon btn-ghost" id="btnLogout" title="Cerrar sesión" style="color:var(--ee-200);">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="demo-bar" id="demoBar" hidden>
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Modo demostración activo — data simulada, ninguna información real de clientes está expuesta (M1.5)</span>
+      <button class="btn btn-sm btn-dark" style="margin-left:auto;" id="btnDemoOff">Salir del modo demostración</button>
+    </div>
+
+    <header class="topbar">
+      <div class="tb-crumb" id="crumb"><b>Cartera</b></div>
+      <div class="tb-right">
+        <label class="switch" title="Modo demostración (M1.5)">
+          <input type="checkbox" id="swDemo"><span class="track"></span>
+          <span class="sw-l t-mut">Demo</span>
+        </label>
+        <div class="btn-grp" id="ejercicioSel"></div>
+        <button class="btn btn-sec btn-sm" id="btnReset" title="Reinicia el prototipo a la data semilla">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          Reiniciar data
+        </button>
+      </div>
+    </header>
+
+    <main class="view" id="view"><!-- render por JS --></main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div id="modalRoot"></div>
+
+<!-- Scripts clásicos: sin módulos ES, funciona abriendo el archivo directamente -->
+<script src="assets/js/catalogos.js"></script>
+<script src="assets/js/seed.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/views-cartera.js"></script>
+<script src="assets/js/views-expediente.js"></script>
+<script src="assets/js/views-formularios.js"></script>
+<script src="assets/js/views-admin.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
