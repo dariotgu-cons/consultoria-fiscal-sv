@@ -1,49 +1,17 @@
 "use client";
 
-import {
-  GoogleAuthProvider,
-  getRedirectResult,
-  signInWithEmailAndPassword,
-  signInWithRedirect,
-} from "firebase/auth";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithRedirect } from "firebase/auth";
+import { useState } from "react";
+import { authErrorCode, mapAuthError } from "@/lib/auth-errors";
+import { useAuth } from "@/lib/auth-context";
 import { getFirebaseAuth } from "@/lib/firebase";
 
-function mapAuthError(code: string): string {
-  switch (code) {
-    case "auth/invalid-credential":
-    case "auth/invalid-email":
-    case "auth/wrong-password":
-    case "auth/user-not-found":
-      return "Correo o contraseña incorrectos.";
-    case "auth/too-many-requests":
-      return "Demasiados intentos. Intenta de nuevo más tarde.";
-    case "auth/account-exists-with-different-credential":
-      return "Ya existe una cuenta con ese correo usando otro método de inicio de sesión.";
-    default:
-      return "No se pudo iniciar sesión. Intenta de nuevo.";
-  }
-}
-
 export default function LoginForm() {
-  const router = useRouter();
+  const { redirectError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Completes the Google sign-in after signInWithRedirect brings the user back here.
-  useEffect(() => {
-    getRedirectResult(getFirebaseAuth())
-      .then((result) => {
-        if (result) router.push("/dashboard");
-      })
-      .catch((err) => {
-        const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
-        setError(mapAuthError(code));
-      });
-  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,10 +19,10 @@ export default function LoginForm() {
     setSubmitting(true);
     try {
       await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
-      router.push("/dashboard");
+      // onAuthStateChanged (in AuthProvider) picks up the new session and
+      // the root page redirects to /dashboard once `user` updates.
     } catch (err) {
-      const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
-      setError(mapAuthError(code));
+      setError(mapAuthError(authErrorCode(err)));
     } finally {
       setSubmitting(false);
     }
@@ -68,11 +36,12 @@ export default function LoginForm() {
       // that a full-page redirect is the reliable way to do this.
       await signInWithRedirect(getFirebaseAuth(), new GoogleAuthProvider());
     } catch (err) {
-      const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
-      setError(mapAuthError(code));
+      setError(mapAuthError(authErrorCode(err)));
       setSubmitting(false);
     }
   }
+
+  const displayedError = error ?? redirectError;
 
   return (
     <form
@@ -83,9 +52,9 @@ export default function LoginForm() {
         Iniciar sesión
       </h1>
 
-      {error && (
+      {displayedError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {error}
+          {displayedError}
         </p>
       )}
 
