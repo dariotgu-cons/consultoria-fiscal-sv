@@ -1,4 +1,18 @@
 {
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "consultoria-fiscal-dev-2026.web.app",
+      "consultoria-fiscal-dev-2026.firebaseapp.com"
+    ],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Consultoría Fiscal SV",
+        "supportEmail": "dtorres@applaudostudios.com"
+      }
+    }
+  },
   "functions": [
     {
       "source": "functions",

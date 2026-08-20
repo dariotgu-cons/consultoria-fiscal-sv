@@ -2,11 +2,12 @@
 
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getFirebaseAuth } from "@/lib/firebase";
 
 function mapAuthError(code: string): string {
@@ -18,8 +19,8 @@ function mapAuthError(code: string): string {
       return "Correo o contraseña incorrectos.";
     case "auth/too-many-requests":
       return "Demasiados intentos. Intenta de nuevo más tarde.";
-    case "auth/popup-closed-by-user":
-      return "Se cerró la ventana de Google antes de completar el inicio de sesión.";
+    case "auth/account-exists-with-different-credential":
+      return "Ya existe una cuenta con ese correo usando otro método de inicio de sesión.";
     default:
       return "No se pudo iniciar sesión. Intenta de nuevo.";
   }
@@ -31,6 +32,18 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Completes the Google sign-in after signInWithRedirect brings the user back here.
+  useEffect(() => {
+    getRedirectResult(getFirebaseAuth())
+      .then((result) => {
+        if (result) router.push("/dashboard");
+      })
+      .catch((err) => {
+        const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
+        setError(mapAuthError(code));
+      });
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,12 +64,12 @@ export default function LoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
-      router.push("/dashboard");
+      // Popups get blocked by browsers/extensions often enough in production
+      // that a full-page redirect is the reliable way to do this.
+      await signInWithRedirect(getFirebaseAuth(), new GoogleAuthProvider());
     } catch (err) {
       const code = err instanceof Error && "code" in err ? String((err as { code: string }).code) : "";
       setError(mapAuthError(code));
-    } finally {
       setSubmitting(false);
     }
   }
