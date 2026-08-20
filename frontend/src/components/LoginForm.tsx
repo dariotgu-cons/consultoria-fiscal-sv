@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getFirebaseAuth } from "@/lib/firebase";
 
 export default function LoginForm() {
-  const { redirectError } = useAuth();
+  const { redirectError, redirectDebug, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +108,11 @@ export default function LoginForm() {
       >
         Continuar con Google
       </button>
+
+      {/* Panel temporal de diagnostico -- quitar una vez resuelto el login con Google */}
+      <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-100 p-2 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+        {JSON.stringify({ authLoading: loading, redirectDebug }, null, 2)}
+      </pre>
     </form>
   );
 }
